@@ -1,0 +1,6 @@
+kaleido==0.1.0.post1
+pandas==2.2.2
+plotly
+seaborn==0.13.2
+matplotlib==3.9.1
+scikit-learn
