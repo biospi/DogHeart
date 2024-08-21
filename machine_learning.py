@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-from utils_ import plot_heatmap_plotly
+from utils import plot_heatmap_plotly
 
 # Set matplotlib to use Times New Roman
 rcParams['font.family'] = 'serif'
