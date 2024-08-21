@@ -1,19 +1,16 @@
-import numpy as np
-import pandas as pd
 from pathlib import Path
 
-from matplotlib.colors import ListedColormap
-from sklearn.inspection import DecisionBoundaryDisplay
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.decomposition import PCA
-from sklearn.svm import SVC
-from sklearn.metrics import roc_curve, auc, accuracy_score, classification_report
-from sklearn.preprocessing import LabelEncoder, StandardScaler
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from matplotlib import rcParams
+from sklearn.decomposition import PCA
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 
-from utils import plot_heatmap_plotly
+from utils_ import plot_heatmap_plotly
 
 # Set matplotlib to use Times New Roman
 rcParams['font.family'] = 'serif'
@@ -26,13 +23,16 @@ from visu import show_db
 def svm(out_dir, dataset_path, samples=None):
     out_dir.mkdir(parents=True, exist_ok=True)
     df_raw = pd.read_csv(dataset_path)
-    features_columns = [x for x in df_raw.columns if x[0] == 'x']
-    df_raw['unique_values'] = df_raw.apply(lambda row: row.nunique(), axis=1)
+    features_columns_pulse = [x for x in df_raw.columns if 'pulse' in x.lower()]
+    features_columns_counts = [x for x in df_raw.columns if 'count' in x.lower()]
+    features_columns_mag = [x for x in df_raw.columns if 'magnitude' in x.lower()]
+    features_columns_acc = [x for x in df_raw.columns if 'acc' in x.lower()]
+    df_raw['unique_values_pulse'] = df_raw[features_columns_pulse].apply(lambda row: row.nunique(), axis=1)
 
-    df = df_raw[df_raw['unique_values'] > 2000]
+    df = df_raw[df_raw['unique_values_pulse'] > 2000].copy()
     #df = df_raw
-
-    df_X = df[features_columns]
+    features = features_columns_pulse
+    df_X = df[features]
     df_y = df['label']
 
     y = df_y.apply(lambda x: 1 if x in ['B2', 'C'] else 0)
@@ -42,7 +42,7 @@ def svm(out_dir, dataset_path, samples=None):
     print(df_class_info)
 
     #imputation
-    df_X_imputed = df_X.fillna(df_X.mean())
+    X_imputed = df_X.fillna(df_X.median())
     #df_X_imputed = df_X.fillna(df_X.median())
     #df_X_imputed = df_X.fillna(0)
 
@@ -50,12 +50,15 @@ def svm(out_dir, dataset_path, samples=None):
     print(df['label'].value_counts())
 
     z = df_X.values
-    x = np.asarray(features_columns)
+    x = np.asarray(features)
     sample_labels = [f"{i} {x}" for i, x in enumerate(df['label'])]
     plot_heatmap_plotly(z, x, sample_labels, out_dir, title="samples", filename=f"samples_{dataset_path.stem}.html")
 
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(df_X_imputed)
+    #X_imputed = Normalizer(norm="l1").transform(X_imputed)
+    #X_imputed = np.log(anscombe(X_imputed))
+
+    X_scaled = StandardScaler().fit_transform(X_imputed)
+
     pca = PCA(n_components=2)
     X_pca = pca.fit_transform(X_scaled)
 
@@ -97,10 +100,13 @@ def svm(out_dir, dataset_path, samples=None):
              f"Class 0 ({class0_label}) precision={class_0_precision:.02f} sensitivity{class_0_sensitivity:.02f}\n "
              f"Class 1 ({class1_label}) precision={class_1_precision:.02f} sensitivity{class_1_sensitivity:.02f}\n ")
     show_db(out_dir, title, model, X_pca, y, X_train, y_train, X_test, y_test)
+    #db = DBPlot(model, PCA(n_components=2))
+    #db.fit(X_pca, y.values)
+    #db.plot().show()
     return df
 
 
 if __name__ == "__main__":
-    df_samples = svm(Path("output/ml"), Path("output/datasets/cleaned_dataset_pulse.csv"))
+    df_samples = svm(Path("output/ml"), Path("output/datasets/cleaned_dataset_full.csv"))
 
 

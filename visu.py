@@ -101,7 +101,7 @@ def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test):
                 X_test[y_test == g][:, 0],
                 X_test[y_test == g][:, 1],
                 c=colors[g],
-                cmap=cm_bright,
+                #cmap=cm_bright,
                 edgecolors="yellow",
                 alpha=0.6,
                 label=f"Class {g}"

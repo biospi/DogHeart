@@ -4,3 +4,6 @@ plotly
 seaborn==0.13.2
 matplotlib==3.9.1
 scikit-learn
+nlopt==2.7.1
+setuptools
+numpy==1.26.4
