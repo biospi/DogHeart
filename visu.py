@@ -28,7 +28,7 @@ cm_bright = ListedColormap(["#FF0000", "#0000FF"])
 from sklearn import svm
 
 
-def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test):
+def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test, df_meta):
     x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
     y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
 
@@ -80,6 +80,10 @@ def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test):
         plt.plot(xx, yy_up, "k--")
         plt.legend()
 
+        # Annotate points with metadata
+        for i in range(len(X)):
+            ax.annotate(df_meta.iloc[i], (X[i, 0], X[i, 1]), fontsize=8, ha='right')
+
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(y_min, y_max)
         ax.set_title(score)
@@ -121,6 +125,11 @@ def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test):
             linestyles=["--", "-", "--"],
             levels=[-0.5, 0, 0.5],
         )
+
+        # Annotate points with metadata
+        for i in range(len(X)):
+            ax.annotate(df_meta.iloc[i], (X[i, 0], X[i, 1]), fontsize=8, ha='right')
+
         ax.set_title(score)
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(y_min, y_max)

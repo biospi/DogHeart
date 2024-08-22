@@ -8,6 +8,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from matplotlib.dates import DateFormatter, HourLocator
 from plotly.subplots import make_subplots
+from openpyxl import load_workbook
 
 
 def minimum_spanning_tree(X, copy_X=True):
@@ -52,11 +53,9 @@ def polar_to_cartesian(arr, r):
     return si * co * r
 
 
-
 def get_stage(meta_datafile, df, p_id):
     df_meta = pd.read_csv(meta_datafile)
-    df_meta["timestamp"] = pd.to_datetime(df_meta["Visit Date"], format="%d/%m/%Y")
-    pd.to_datetime(df_meta["Visit Date"], format="%d/%m/%Y")
+    df_meta["timestamp"] = pd.to_datetime(df_meta["Date"])
     reference_timestamp = df['Timestamp'].values[0]
     start_window = reference_timestamp - pd.Timedelta(days=7)
     end_window = reference_timestamp + pd.Timedelta(days=7)
@@ -67,7 +66,12 @@ def get_stage(meta_datafile, df, p_id):
         ]
     stage = df_filtered["Stage"].values[0]
     breed = df_filtered["Breed"].values[0]
-    return stage, breed
+    clinic = df_filtered["Clinic Activity"].values[0]
+    home = df_filtered["Home Activity"].values[0]
+    start_time = df_filtered["Start Time"].values[0]
+    end_time = df_filtered["End Time"].values[0]
+    note = df_filtered["Note"].values[0]
+    return stage, breed, clinic, home, start_time, end_time, note
 
 
 # def visu(input_file):
@@ -259,3 +263,34 @@ def anscombe(arr, sigma_sq=0, alpha=1):
     v = np.maximum((arr / alpha) + (3. / 8.) + sigma_sq / (alpha ** 2), 0)
     f = 2. * np.sqrt(v)
     return f
+
+
+def format_metafile(input_file):
+    sheet_name = 'Timestamps'  # Replace with your sheet name
+    df = pd.read_excel(input_file, sheet_name=sheet_name, skiprows= [0, 1])
+
+    df1 = df.iloc[:, 1:8]
+    df2 = df.iloc[:, 11:]
+    df2.columns = df1.columns
+    # Iterate through each row
+    for df_ in [df1, df2]:
+        df_['Participant No.'] = df_['Participant No.'].ffill()
+        df_['Date'] = df_['Date'].ffill()
+    print(df1)
+
+    df_concat = pd.concat([df1, df2], axis=0)
+    df_concat = df_concat.sort_values(["Participant No.", "Date"])
+
+    df_cleaned = df_concat.dropna(subset=['Clinic Activity', 'Home Activity', 'Start Time', 'End Time', 'Note'],
+                                  how='all')
+    df_cleaned.to_csv("metadata.csv", index=False)
+
+    df_stages = pd.read_csv("meta.csv")
+
+    df_merged = df_cleaned.merge(df_stages[['Participant No.', 'Stage', 'Breed']], on='Participant No.', how='left')
+    df_merged = df_merged.sort_values(["Participant No.", "Date"])
+    df_merged.to_csv("meta_data.csv", index=False)
+
+
+if __name__ == "__main__":
+    format_metafile(Path("C:\Brooke Study Data\Stages and timestamps .xlsx"))
