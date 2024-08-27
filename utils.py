@@ -54,24 +54,75 @@ def polar_to_cartesian(arr, r):
 
 
 def get_stage(meta_datafile, df, p_id):
+    df = df.copy()
+    df["Home Activity"] = "nan"
+    df["Clinic Activity"] = "nan"
+    df["Period"] = "nan"
+    df["Note"] = "nan"
+    df["Time_dt"] = pd.to_datetime(df["Time_dt"], format="%H:%M:%S").dt.time
+
     df_meta = pd.read_csv(meta_datafile)
     df_meta["timestamp"] = pd.to_datetime(df_meta["Date"])
-    reference_timestamp = df['Timestamp'].values[0]
+    reference_timestamp = df["Timestamp"].values[0]
     start_window = reference_timestamp - pd.Timedelta(days=7)
     end_window = reference_timestamp + pd.Timedelta(days=7)
     df_filtered = df_meta[
-        (df_meta['timestamp'] >= start_window) &
-        (df_meta['timestamp'] <= end_window) &
-        (df_meta['Participant No.'] == p_id)
-        ]
+        (df_meta["timestamp"] >= start_window)
+        & (df_meta["timestamp"] <= end_window)
+        & (df_meta["Participant No."] == p_id)
+    ]
+    df_filtered_day = df_meta[
+        (df_meta["timestamp"] == reference_timestamp)
+        & (df_meta["Participant No."] == p_id)
+    ]
     stage = df_filtered["Stage"].values[0]
     breed = df_filtered["Breed"].values[0]
-    clinic = df_filtered["Clinic Activity"].values[0]
-    home = df_filtered["Home Activity"].values[0]
-    start_time = df_filtered["Start Time"].values[0]
-    end_time = df_filtered["End Time"].values[0]
-    note = df_filtered["Note"].values[0]
-    return stage, breed, clinic, home, start_time, end_time, note
+
+    for i, row in df_filtered_day.iterrows():
+        start_time = pd.to_datetime(row["Start Time"], format="%H:%M:%S").time()
+        if not pd.isna(row["End Time"]):
+            end_time = pd.to_datetime(row["End Time"], format="%H:%M:%S").time()
+        else:
+            end_time = start_time
+
+        df.loc[
+            (df["Time_dt"] >= start_time) & (df["Time_dt"] <= end_time), "Home Activity"
+        ] = row["Home Activity"]
+        df.loc[
+            (df["Time_dt"] >= start_time) & (df["Time_dt"] <= end_time),
+            "Clinic Activity",
+        ] = row["Clinic Activity"]
+        df.loc[
+            (df["Time_dt"] >= start_time) & (df["Time_dt"] <= end_time), "Period"
+        ] = (str(row["Start Time"]) + " " + str(row["End Time"]))
+        df.loc[(df["Time_dt"] >= start_time) & (df["Time_dt"] <= end_time), "Note"] = (
+            row["Note"]
+        )
+
+    clinic = (
+        df_filtered_day["Clinic Activity"].values[0]
+        if len(df_filtered_day["End Time"].values) > 0
+        else None
+    )
+    home = (
+        " ".join(df_filtered_day["Home Activity"].astype(str))
+        + "-"
+        + " ".join(df_filtered_day["Start Time"].astype(str))
+        + "-"
+        + " ".join(df_filtered_day["End Time"].astype(str))
+    )
+    start_time = (
+        df_filtered_day["Start Time"].values[0]
+        if len(df_filtered_day["Start Time"]) > 0
+        else None
+    )
+    end_time = (
+        df_filtered_day["End Time"].values[0]
+        if len(df_filtered_day["End Time"].values) > 0
+        else None
+    )
+    note = " ".join(df_filtered_day["Note"].astype(str))
+    return df, stage, breed, clinic, home, start_time, end_time, note
 
 
 # def visu(input_file):
@@ -149,12 +200,7 @@ def plot_heatmap_plotly(
     xaxis="Time",
 ):
     fig = make_subplots(rows=1, cols=1)
-    trace = go.Heatmap(
-        z=X,
-        x=timestamps,
-        y=animal_ids,
-        colorscale="Viridis"
-    )
+    trace = go.Heatmap(z=X, x=timestamps, y=animal_ids, colorscale="Viridis")
     fig.add_trace(trace, row=1, col=1)
     fig.update_layout(title_text=title)
     fig.update_layout(xaxis_title=xaxis)
@@ -169,19 +215,19 @@ def plot_heatmap_plotly(
 
 
 def plot_heatmap(
-        X,
-        timestamps,
-        animal_ids,
-        out_dir,
-        title="Heatmap",
-        filename="heatmap.png",
-        yaxis="Data",
-        xaxis="Time",
-        figsize=(20, 20),
-        dpi=300
+    X,
+    timestamps,
+    animal_ids,
+    out_dir,
+    title="Heatmap",
+    filename="heatmap.png",
+    yaxis="Data",
+    xaxis="Time",
+    figsize=(20, 20),
+    dpi=300,
 ):
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
-    cax = ax.imshow(X, aspect='auto', cmap='viridis', interpolation='nearest')
+    cax = ax.imshow(X, aspect="auto", cmap="viridis", interpolation="nearest")
 
     # Set title and labels
     ax.set_title(title)
@@ -190,13 +236,13 @@ def plot_heatmap(
 
     # Format x-axis to display ticks for each hour
     ax.xaxis.set_major_locator(HourLocator(interval=1))
-    ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
+    ax.xaxis.set_major_formatter(DateFormatter("%H:%M"))
 
     # Set x and y ticks and labels
     ax.set_xticks(timestamps)
     ax.set_yticks(animal_ids)
     ax.set_xticklabels(timestamps, rotation=90)
-    #ax.set_yticklabels(animal_ids)
+    # ax.set_yticklabels(animal_ids)
 
     # Add colorbar
     fig.colorbar(cax)
@@ -206,7 +252,7 @@ def plot_heatmap(
 
     # Save the plot
     file_path = out_dir / filename.replace("=", "_").lower()
-    plt.savefig(file_path, bbox_inches='tight')
+    plt.savefig(file_path, bbox_inches="tight")
     plt.close(fig)
 
     print(file_path)
@@ -215,26 +261,43 @@ def plot_heatmap(
 
 def resample(df):
     # Create a complete range of timestamps for the entire day at second intervals
-    start_time = df['Timestamp'].iloc[0].replace(hour=0, minute=0, second=0)
-    end_time = df['Timestamp'].iloc[-1].replace(hour=23, minute=59, second=59)
-    full_range = pd.date_range(start=start_time, end=end_time, freq='s')
+    start_time = df["Timestamp"].iloc[0].replace(hour=0, minute=0, second=0)
+    end_time = df["Timestamp"].iloc[-1].replace(hour=23, minute=59, second=59)
+    full_range = pd.date_range(start=start_time, end=end_time, freq="s")
 
     # Reindex the dataframe to the full range of timestamps
     df_full = pd.DataFrame(index=full_range)
-    df_full['Timestamp'] = df_full.index
+    df_full["Timestamp"] = df_full.index
     df_full = df_full.reset_index(drop=True)
 
     # Merge the original dataframe with the full range dataframe
-    df_full = df_full.merge(df[['AccX', 'AccY', 'AccZ', 'MagX', 'MagY', 'MagZ', 'Pulse', 'SpO2', 'Timestamp', 'Counts']], on='Timestamp', how='left')
+    df_full = df_full.merge(
+        df[
+            [
+                "AccX",
+                "AccY",
+                "AccZ",
+                "MagX",
+                "MagY",
+                "MagZ",
+                "Pulse",
+                "SpO2",
+                "Timestamp",
+                "Counts",
+            ]
+        ],
+        on="Timestamp",
+        how="left",
+    )
 
     # Extract the time from the Timestamp for the Time_dt column
-    df_full['Time_dt'] = df_full['Timestamp'].dt.time
-    #df_full = df_full.head(86400) #86400 in a day
+    df_full["Time_dt"] = df_full["Timestamp"].dt.time
+    # df_full = df_full.head(86400) #86400 in a day
     # df_full['Magnitude'] = np.sqrt(df_full['AccX'] ** 2 + df_full['AccY'] ** 2 + df_full['AccZ'] ** 2)
     # df_full.index = df_full['Timestamp']
     # df_full['Counts'] = df_full['Magnitude'].rolling('60s').apply(count_above_threshold)
 
-    grouped = df_full.groupby(df_full['Timestamp'].dt.date)
+    grouped = df_full.groupby(df_full["Timestamp"].dt.date)
     dfs = [group for _, group in grouped]
 
     return df_full, dfs
@@ -260,34 +323,40 @@ def anscombe(arr, sigma_sq=0, alpha=1):
     :param alpha: scaling factor of the Poisson noise component
     :return: variance-stabilized array
     """
-    v = np.maximum((arr / alpha) + (3. / 8.) + sigma_sq / (alpha ** 2), 0)
-    f = 2. * np.sqrt(v)
+    v = np.maximum((arr / alpha) + (3.0 / 8.0) + sigma_sq / (alpha**2), 0)
+    f = 2.0 * np.sqrt(v)
     return f
 
 
 def format_metafile(input_file):
-    sheet_name = 'Timestamps'  # Replace with your sheet name
-    df = pd.read_excel(input_file, sheet_name=sheet_name, skiprows= [0, 1])
+    sheet_name = "Timestamps"  # Replace with your sheet name
+    df = pd.read_excel(input_file, sheet_name=sheet_name, skiprows=[0, 1])
 
     df1 = df.iloc[:, 1:8]
     df2 = df.iloc[:, 11:]
     df2.columns = df1.columns
     # Iterate through each row
     for df_ in [df1, df2]:
-        df_['Participant No.'] = df_['Participant No.'].ffill()
-        df_['Date'] = df_['Date'].ffill()
+        df_["Participant No."] = df_["Participant No."].ffill()
+        df_["Date"] = df_["Date"].ffill()
     print(df1)
 
     df_concat = pd.concat([df1, df2], axis=0)
     df_concat = df_concat.sort_values(["Participant No.", "Date"])
 
-    df_cleaned = df_concat.dropna(subset=['Clinic Activity', 'Home Activity', 'Start Time', 'End Time', 'Note'],
-                                  how='all')
+    df_cleaned = df_concat.dropna(
+        subset=["Clinic Activity", "Home Activity", "Start Time", "End Time", "Note"],
+        how="all",
+    )
     df_cleaned.to_csv("metadata.csv", index=False)
 
     df_stages = pd.read_csv("meta.csv")
 
-    df_merged = df_cleaned.merge(df_stages[['Participant No.', 'Stage', 'Breed']], on='Participant No.', how='left')
+    df_merged = df_cleaned.merge(
+        df_stages[["Participant No.", "Stage", "Breed"]],
+        on="Participant No.",
+        how="left",
+    )
     df_merged = df_merged.sort_values(["Participant No.", "Date"])
     df_merged.to_csv("meta_data.csv", index=False)
 

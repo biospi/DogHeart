@@ -6,7 +6,7 @@ import pandas as pd
 from utils import plot_heatmap_plotly, resample, count_above_threshold, get_stage
 
 
-def build_samples_day(out_dir, v, df, sep="__"):
+def build_samples_day(out_dir, v, df, df_list, sep="__"):
     print(f"Building samples for {v}...")
     df_samples = df.copy()
     df_samples.columns = [f"x{i}" for i in range(len(df_samples.columns))]
@@ -20,16 +20,20 @@ def build_samples_day(out_dir, v, df, sep="__"):
     df_samples["end_time"] = df_samples.index.str.split(sep).str[7].values
     df_samples["note"] = df_samples.index.str.split(sep).str[8].values
     df_samples = df_samples.reset_index(drop=True)
-    build_samples_hour(out_dir, df_samples, v)
+    build_samples_hour(out_dir, df_samples, v, df_list)
     df_cleaned = df_samples.dropna(subset=[f"x{i}" for i in range(86400)], how="all")
     print(df_cleaned)
     df_cleaned.to_csv(out_dir / f"{v}_dataset_day.csv", index=False)
 
 
-def build_samples_hour(out_dir, df, v):
+def build_samples_hour(out_dir, df, v, df_list):
     data = []
     for _, row in df.iterrows():
-        hourly_segments = split_features(row)
+
+        meta = df_list[int(row["id"])]
+        print(df_list[int(row["id"])])
+
+        hourly_segments = split_features(row, meta)
         for (
                 segment_features,
                 label,
@@ -47,6 +51,17 @@ def build_samples_hour(out_dir, df, v):
                 median,
                 missingness_percentage,
         ) in hourly_segments:
+            if home == '' or pd.isna(home):
+                if 'home' in note.lower():
+                    home = "Home"
+                if 'garden' in note.lower():
+                    home = "Garden"
+                if 'sleep' in note.lower():
+                    home = "Sleep"
+                if 'running' in note.lower():
+                    home = "Running"
+                if 'playing' in note.lower():
+                    home = "Playing"
             new_row = list(segment_features) + [
                 label,
                 participant_id,
@@ -86,20 +101,35 @@ def build_samples_hour(out_dir, df, v):
     df_cleaned.to_csv(out_dir / f"{v}_dataset_hour.csv", index=False)
 
 
-def split_features(row):
+def split_features(row, meta):
     hourly_segments = []
     label = row["label"]
     participant_id = row["id"]
     breed = row["breed"]
     day = row["date"]
-    clinic = row["clinic"]
-    home = row["home"]
-    start_time = row["start_time"]
-    end_time = row["end_time"]
-    note = row["note"]
+    clinic = 'nan'
+    home = 'nan'
+    start_time = 'nan'
+    end_time = 'nan'
+    note = 'nan'
 
     features = row.drop(["label", "id", "breed", "date", "clinic", "home", "start_time", "end_time", "note"]).values
     for hour in range(24):
+        df_m_h = meta[meta['Time_dt'].apply(lambda x: x.hour) == hour]
+
+        clinic = np.unique(df_m_h["Clinic Activity"].values.astype(str))
+        clinic = "__".join([x for x in clinic if x != 'nan'])
+        home = np.unique(df_m_h["Home Activity"].values.astype(str))
+        home = "__".join([x for x in home if x != 'nan'])
+        note = np.unique(df_m_h["Note"].values.astype(str))
+        note = "__".join([x for x in note if x != 'nan'])
+        period = np.unique(df_m_h["Period"].values.astype(str))
+        if len(period) > 0:
+            if period[0] != "nan":
+                split = period[0].split(' ')
+                start_time = split[0]
+                end_time = split[1]
+
         segment_features = features[hour * 3600 : (hour + 1) * 3600]
         pos_value_count = len(segment_features[segment_features > 0])
         mean = np.nanmean(segment_features)
@@ -126,6 +156,11 @@ def split_features(row):
                 missingness_percentage,
             )
         )
+        clinic = 'nan'
+        home = 'nan'
+        start_time = 'nan'
+        end_time = 'nan'
+        note = 'nan'
 
     return hourly_segments
 
@@ -140,29 +175,36 @@ def build_datasets(out_dir):
     df_mag = pd.read_csv(out_dir / "Magnitude_dataset_hour.csv")
     df_counts = df_counts.head(len(df_pulse))
 
-    mask_miss = df_pulse["missingness_percentage"] < 50
-    df_p = df_pulse[mask_miss]
-    df_c = df_counts[mask_miss]
-    df_x = df_accx[mask_miss]
-    df_y = df_accy[mask_miss]
-    df_z = df_accz[mask_miss]
-    df_m = df_mag[mask_miss]
+    df_p = df_pulse
+    df_c = df_counts
+    df_x = df_accx
+    df_y = df_accy
+    df_z = df_accz
+    df_m = df_mag
 
-    mask_miss = df_c["missingness_percentage"] < 50
-    df_p = df_p[mask_miss]
-    df_c = df_c[mask_miss]
-    df_x = df_x[mask_miss]
-    df_y = df_y[mask_miss]
-    df_z = df_z[mask_miss]
-    df_m = df_m[mask_miss]
-
-    mask_activity = df_c["mean"] > 3
-    df_p = df_p[mask_activity]
-    df_c = df_c[mask_activity]
-    df_x = df_x[mask_activity]
-    df_y = df_y[mask_activity]
-    df_z = df_z[mask_activity]
-    df_m = df_m[mask_activity]
+    # mask_miss = df_pulse["missingness_percentage"] < 100
+    # df_p = df_pulse[mask_miss]
+    # df_c = df_counts[mask_miss]
+    # df_x = df_accx[mask_miss]
+    # df_y = df_accy[mask_miss]
+    # df_z = df_accz[mask_miss]
+    # df_m = df_mag[mask_miss]
+    #
+    # mask_miss = df_c["missingness_percentage"] < 50
+    # df_p = df_p[mask_miss]
+    # df_c = df_c[mask_miss]
+    # df_x = df_x[mask_miss]
+    # df_y = df_y[mask_miss]
+    # df_z = df_z[mask_miss]
+    # df_m = df_m[mask_miss]
+    #
+    # mask_activity = df_c["mean"] > 3
+    # df_p = df_p[mask_activity]
+    # df_c = df_c[mask_activity]
+    # df_x = df_x[mask_activity]
+    # df_y = df_y[mask_activity]
+    # df_z = df_z[mask_activity]
+    # df_m = df_m[mask_activity]
 
     df_p.to_csv(out_dir / "cleaned_dataset_pulse.csv", index=False)
     df_c.to_csv(out_dir / "cleaned_dataset_counts.csv", index=False)
@@ -251,7 +293,14 @@ def main(meta_datafile, input_dir, out_dir):
     out_dir.mkdir(exist_ok=True, parents=True)
     print(f"input_dir={input_dir}")
     files = list(input_dir.glob("*.csv"))
-    vars = ["AccX", "AccY", "AccZ", "MagX", "MagY", "MagZ", "Pulse", "SpO2"]
+    vars = ["AccX",
+            "AccY",
+            "AccZ",
+            "MagX",
+            "MagY",
+            "MagZ",
+            "Pulse",
+            "SpO2"]
     data_dict = {
         "AccX": [],
         "AccY": [],
@@ -263,6 +312,10 @@ def main(meta_datafile, input_dir, out_dir):
         "SpO2": [],
         "Counts": [],
         "Magnitude": [],
+        "Home Activity": [],
+        "Clinic Activity": [],
+        "Period": [],
+        "Note": []
     }
     time_dict = {
         "AccX": [],
@@ -275,6 +328,10 @@ def main(meta_datafile, input_dir, out_dir):
         "SpO2": [],
         "Counts": [],
         "Magnitude": [],
+        "Home Activity": [],
+        "Clinic Activity": [],
+        "Period": [],
+        "Note": []
     }
     id_dict = {
         "AccX": [],
@@ -287,7 +344,12 @@ def main(meta_datafile, input_dir, out_dir):
         "SpO2": [],
         "Counts": [],
         "Magnitude": [],
+        "Home Activity": [],
+        "Clinic Activity": [],
+        "Period": [],
+        "Note": []
     }
+    df_list = {}
     for j, file in enumerate(files):
         print(f"processing {j}/{len(files)} {file}...")
         df = pd.read_csv(file, on_bad_lines="warn")
@@ -298,33 +360,57 @@ def main(meta_datafile, input_dir, out_dir):
         for i, df in enumerate(dfs):
             p_id = int(file.stem.split("_")[0].replace("P", ""))
             df = df.head(86400)  # 86400 in a day
-            stage, breed, clinic, home, start_time, end_time, note = get_stage(
+            df, stage, breed, clinic, home, start_time, end_time, note = get_stage(
                 meta_datafile, df, p_id
             )
-            df = df[
-                vars + ["Timestamp", "Time_dt"]
-            ].copy()  # Ensure you are working with a copy
+            # df = df[
+            #     vars + ["Timestamp", "Time_dt"]
+            # ].copy()  # Ensure you are working with a copy
             day = pd.to_datetime(df["Timestamp"].values[0]).strftime("%d/%m/%Y")
             label = f"{p_id}__{stage}__{breed}__{day}__{clinic}__{home}__{start_time}__{end_time}__{note}"
+            # df["id"] = label
+
+            # label = (str(p_id) + "__" +
+            #             str(stage) + "__" +
+            #             str(breed) + "__" +
+            #             str(day) + "__" +
+            #             df["Clinic Activity"] + "__" +
+            #             df["Home Activity"] + "__" +
+            #             df["Period"] + "__" +
+            #             df["Note"] + "__" +
+            #             str(i)
+            #          ).tolist()
             df["id"] = label
+
             df["Magnitude"] = np.sqrt(
                 df["AccX"] ** 2 + df["AccY"] ** 2 + df["AccZ"] ** 2
             )
             df.index = df["Timestamp"]
             df["Counts"] = df["Magnitude"].rolling("60s").apply(count_above_threshold)
             # vars = ['AccX', 'AccY', 'AccZ', 'MagX', 'MagY', 'MagZ', 'Pulse', 'SpO2', 'Counts', 'Magnitude']
+            df_list[p_id] = df
 
             for var in vars + ["Counts", "Magnitude"]:
                 data_dict[var].append(df[var].values.tolist())
                 time_dict[var].append(df["Time_dt"].values.tolist())
                 id_dict[var].append(f"{label}__{i}")
+                # id_dict[var].append(f"{label}__{i}")
+                #id_dict[var].append(label)
+        # id_list.append((str(p_id) + "__" +
+        #                 str(stage) + "__" +
+        #                 str(breed) + "__" +
+        #                 str(day) + "__" +
+        #                 df["Clinic Activity"] + "__" +
+        #                 df["Home Activity"] + "__" +
+        #                 df["Period"] + "__" +
+        #                 df["Note"]).tolist())
 
     for v in vars + ["Counts", "Magnitude"]:
         data = np.array(data_dict[v])
         time_list = np.array(time_dict[v])
         id_list = np.array(id_dict[v])
         df_data = pd.DataFrame(data, columns=time_list[0], index=id_list)
-        build_samples_day(out_dir, v, df_data)
+        build_samples_day(out_dir, v, df_data, df_list)
         # plotly struggles with second resolution data because too many data points
         # df_data = df_data.dropna(axis=1, how="all")
         # z = df_data.values
@@ -345,7 +431,7 @@ def main(meta_datafile, input_dir, out_dir):
 
 
 if __name__ == "__main__":
-    out_dir = Path("output/datasets")
+    out_dir = Path("output/datasets4")
     meta_datafile = Path(r"C:\Brooke Study Data\meta_data.csv")
     data_dir = Path(r"C:\Brooke Study Data\Data")
     main(meta_datafile, data_dir, out_dir)
