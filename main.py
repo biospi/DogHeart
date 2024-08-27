@@ -97,6 +97,7 @@ def build_samples_hour(out_dir, df, v, df_list):
     ]
     df_h = pd.DataFrame(data, columns=columns)
     df_cleaned = df_h.dropna(subset=[f"x{i}" for i in range(3600)], how="all")
+    df_cleaned.loc[(df_cleaned["clinic"] == '') & (df_cleaned["home"] == ''), "home"] = "Home"
     print(df_cleaned)
     df_cleaned.to_csv(out_dir / f"{v}_dataset_hour.csv", index=False)
 
@@ -431,7 +432,7 @@ def main(meta_datafile, input_dir, out_dir):
 
 
 if __name__ == "__main__":
-    out_dir = Path("output/datasets4")
+    out_dir = Path("output/datasets5")
     meta_datafile = Path(r"C:\Brooke Study Data\meta_data.csv")
     data_dir = Path(r"C:\Brooke Study Data\Data")
     main(meta_datafile, data_dir, out_dir)

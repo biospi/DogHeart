@@ -31,17 +31,16 @@ def svm(out_dir, dataset_path, samples=None):
         lambda row: row.nunique(), axis=1
     )
 
-    df = df_raw[df_raw["unique_values_pulse"] > 2000].copy()
+    #df = df_raw[df_raw["unique_values_pulse"] > 2000].copy()
+    df = df_raw
     df = df[df["label"] != 'C']
-    # df = df_raw
+
     features = features_columns_pulse
     df_X = df[features]
     df_y = df["label"]
 
-    df_breed = df["breed"]
-    df_label = df["label"]
-    df_clinic = df["clinic"]
-    df_meta = df_breed + " " + df_label + " " + df_clinic
+    df_meta = df["clinic"].astype(str) + df["home"].astype(str) + df["label"].astype(str)
+    df_meta = df_meta.str.replace('nan','')
 
     y = df_y.apply(lambda x: 1 if x in ["B2"] else 0)
     df["target"] = y
@@ -129,5 +128,5 @@ def svm(out_dir, dataset_path, samples=None):
 
 if __name__ == "__main__":
     df_samples = svm(
-        Path("output/ml"), Path("output/datasets4/cleaned_dataset_full.csv")
+        Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv")
     )

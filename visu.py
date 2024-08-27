@@ -32,6 +32,8 @@ def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test, df_meta
     x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
     y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
 
+    fig, ax = plt.subplots(figsize=(20, 10))
+
     is_linear_model = False
     if hasattr(clf, 'kernel'):
         if clf.kernel == 'linear':
@@ -55,7 +57,6 @@ def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test, df_meta
         yy_down = yy - np.sqrt(1 + a ** 2) * margin
         yy_up = yy + np.sqrt(1 + a ** 2) * margin
 
-        fig, ax = plt.subplots()
         DecisionBoundaryDisplay.from_estimator(
             clf, X, cmap=cm, alpha=0.8, ax=ax, eps=0.5
         )
@@ -89,7 +90,6 @@ def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test, df_meta
         ax.set_title(score)
         fig.tight_layout()
     else:
-        fig, ax = plt.subplots()
         DecisionBoundaryDisplay.from_estimator(
             clf, X, cmap=cm, alpha=0.8, ax=ax, eps=0.5
         )
@@ -137,4 +137,6 @@ def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test, df_meta
         fig.tight_layout()
     out_dir.mkdir(parents=True, exist_ok=True)
     fig.show()
-    fig.savefig(out_dir / "db.png", dpi=300)
+    filepath = out_dir / "db.png"
+    print(filepath)
+    fig.savefig(filepath, dpi=400)
