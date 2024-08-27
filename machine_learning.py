@@ -33,7 +33,11 @@ def svm(out_dir, dataset_path, samples=None):
 
     #df = df_raw[df_raw["unique_values_pulse"] > 2000].copy()
     df = df_raw
-    df = df[df["label"] != 'C']
+    df = df[df["mean"] > 3]
+    df = df[df["missingness_percentage"] <= 50] #keep samples with less than 50% of missing points
+    #df = df[df["pos_value_count"] > 100] #keep samples with positive values  above threshold
+    df = df[df["label"] != 'C'] #remove C category
+    df = df[pd.isna(df["clinic"])] #only keep home data
 
     features = features_columns_pulse
     df_X = df[features]
