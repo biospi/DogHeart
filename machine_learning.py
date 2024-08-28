@@ -31,20 +31,36 @@ def svm(out_dir, dataset_path, samples=None):
         lambda row: row.nunique(), axis=1
     )
 
-    #df = df_raw[df_raw["unique_values_pulse"] > 2000].copy()
+    # df = df_raw[df_raw["unique_values_pulse"] > 2000].copy()
     df = df_raw
     df = df[df["mean"] > 3]
-    df = df[df["missingness_percentage"] <= 50] #keep samples with less than 50% of missing points
-    #df = df[df["pos_value_count"] > 100] #keep samples with positive values  above threshold
-    df = df[df["label"] != 'C'] #remove C category
-    df = df[pd.isna(df["clinic"])] #only keep home data
+    df = df[
+        df["missingness_percentage"] <= 50
+    ]  # keep samples with less than 50% of missing points
+    # df = df[df["pos_value_count"] > 100] #keep samples with positive values  above threshold
+    df = df[df["label"] != "C"]  # remove C category
+    df = df[pd.isna(df["clinic"])]  # only keep home data
 
     features = features_columns_pulse
     df_X = df[features]
     df_y = df["label"]
 
-    df_meta = df["clinic"].astype(str) + df["home"].astype(str) + df["label"].astype(str)
-    df_meta = df_meta.str.replace('nan','')
+    df_meta = (
+        df["clinic"].astype(str) + df["home"].astype(str) + df["label"].astype(str)
+    )
+    df_meta = (
+        df_meta.str.replace("nan", "")
+        .str.replace("Home", "")
+        .str.replace("Walk", "W")
+        .str.replace("Food", "F")
+        .str.replace("House", "H")
+        .str.replace("Sleep", "S")
+        .str.replace("Garden", "G")
+        .str.replace("garden", "G")
+        .str.replace("Dinner", "D")
+        .str.replace("Rest", "R")
+        .str.replace("B", "")
+    )
 
     y = df_y.apply(lambda x: 1 if x in ["B2"] else 0)
     df["target"] = y

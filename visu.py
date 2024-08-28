@@ -32,7 +32,8 @@ def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test, df_meta
     x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
     y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
 
-    fig, ax = plt.subplots(figsize=(20, 10))
+    fig, ax = plt.subplots()
+    fontsize = 8
 
     is_linear_model = False
     if hasattr(clf, 'kernel'):
@@ -83,7 +84,7 @@ def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test, df_meta
 
         # Annotate points with metadata
         for i in range(len(X)):
-            ax.annotate(df_meta.iloc[i], (X[i, 0], X[i, 1]), fontsize=8, ha='right')
+            ax.annotate(df_meta.iloc[i], (X[i, 0], X[i, 1]), ha='right', fontsize=fontsize)
 
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(y_min, y_max)
@@ -128,7 +129,7 @@ def show_db(out_dir, score, clf, X, y, X_train, y_train, X_test, y_test, df_meta
 
         # Annotate points with metadata
         for i in range(len(X)):
-            ax.annotate(df_meta.iloc[i], (X[i, 0], X[i, 1]), fontsize=8, ha='right')
+            ax.annotate(df_meta.iloc[i], (X[i, 0], X[i, 1]), ha='right', fontsize=fontsize)
 
         ax.set_title(score)
         ax.set_xlim(x_min, x_max)
