@@ -31,7 +31,7 @@ from sklearn.metrics import RocCurveDisplay
 from visu import show_db
 
 
-def svm_loocv(out_dir, dataset_path, n_bootstrap=1000, n_job=6):
+def svm_loocv(out_dir, dataset_path, n_bootstrap=10, n_job=6):
     out_dir.mkdir(parents=True, exist_ok=True)
     df_raw = pd.read_csv(dataset_path)
     features_columns_pulse = [x for x in df_raw.columns if "pulse" in x.lower()]
