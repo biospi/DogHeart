@@ -631,12 +631,12 @@ def mean_ci(data):
 
 
 if __name__ == "__main__":
-    # df_samples = svm(
-    #     Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv")
-    # )
-    svm_loocv(
+    df_samples = svm(
         Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv")
     )
+    # svm_loocv(
+    #     Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv")
+    # )
 
     # svm_l2out(
     #     Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv")
