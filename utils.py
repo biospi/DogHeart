@@ -9,6 +9,8 @@ import plotly.graph_objects as go
 from matplotlib.dates import DateFormatter, HourLocator
 from plotly.subplots import make_subplots
 from openpyxl import load_workbook
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 def minimum_spanning_tree(X, copy_X=True):
@@ -361,32 +363,35 @@ def format_metafile(input_file):
     df_merged.to_csv("meta_data.csv", index=False)
 
 
-if __name__ == "__main__":
-    #format_metafile(Path("C:\Brooke Study Data\Stages and timestamps .xlsx"))
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    # Example data
-    list1 = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    list2 = [9, 8, 7, 6, 5, 4, 3, 2, 1]
-
+def get_2d_histogram(list1, list2, plot=True):
     # Compute the 2D histogram
     counts, x_edges, y_edges = np.histogram2d(list1, list2, bins=10)
 
-    plt.imshow(counts.T, origin='lower', extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], aspect='auto',
-               cmap='Blues')
-    plt.colorbar(label='Counts')
-    plt.xlabel('Sensor 1 Measurements')
-    plt.ylabel('Sensor 2 Measurements')
-    plt.title('2D Histogram of Sensor Data')
-    plt.show()
+    if plot:
+        plt.imshow(counts.T, origin='lower', extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], aspect='auto',
+                   cmap='Blues')
+        plt.colorbar(label='Counts')
+        plt.xlabel('Sensor 1 Measurements')
+        plt.ylabel('Sensor 2 Measurements')
+        plt.title('2D Histogram of Sensor Data')
+        plt.show()
 
     # Combine all data into a single matrix
     histogram_matrix = np.zeros((counts.shape[0] + 2, counts.shape[1] + 2))
     histogram_matrix[0, 1:-1] = x_edges[:-1]  # X-axis bin starts
     histogram_matrix[1:-1, 0] = y_edges[:-1]  # Y-axis bin starts
     histogram_matrix[1:-1, 1:-1] = counts  # Bin counts
-
-    # Print the combined matrix
     print("Histogram Matrix:")
     print(histogram_matrix)
+    return histogram_matrix
+
+
+if __name__ == "__main__":
+    #format_metafile(Path("C:\Brooke Study Data\Stages and timestamps .xlsx"))
+
+
+    # Example data
+    list1 = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    list2 = [9, 8, 7, 6, 5, 4, 3, 2, 1]
+
+    get_2d_histogram(list1, list2)

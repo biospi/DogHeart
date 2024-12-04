@@ -22,7 +22,7 @@ from sklearn.metrics import (
 from sklearn.metrics import precision_recall_fscore_support
 
 import boot_roc_curve
-from utils import plot_heatmap_plotly
+from utils import plot_heatmap_plotly, get_2d_histogram
 
 # Set matplotlib to use Times New Roman
 rcParams["font.family"] = "serif"
@@ -439,8 +439,25 @@ def svm(out_dir, dataset_path, samples=None):
     #df = df[pd.isna(df["clinic"])]  # only keep home data
 
     features = features_columns_pulse
+
+    df_pulse = df[features_columns_pulse]
+    df_pulse = df_pulse.fillna(df_pulse.median())
+    df_count = df[features_columns_counts]
+    df_count = df_count.fillna(df_count.median())
+
     df_X = df[features]
     df_y = df["label"]
+
+    hist_samples = []
+    for (index, row_pulse), (index, row_count) in zip(df_pulse.iterrows(), df_count.iterrows()):
+        data1 = row_pulse.tolist()
+        data2 = row_count.tolist()[0:len(data1)]
+        hist = get_2d_histogram(data1, data2, plot=False)
+        hist_sample = hist.flatten().tolist()
+        hist_samples.append(hist_sample)
+
+    df_hist = pd.DataFrame(hist_samples)
+    df_X = df_hist
 
     df_meta = (
         df["clinic"].astype(str) + df["home"].astype(str) + df["label"].astype(str)
@@ -490,7 +507,7 @@ def svm(out_dir, dataset_path, samples=None):
 
     X_scaled = StandardScaler().fit_transform(X_imputed)
 
-    pca = PCA(n_components=50)
+    pca = PCA(n_components=5)
     X_pca = pca.fit_transform(X_scaled)
 
     # X_train, X_test, y_train, y_test = train_test_split(
