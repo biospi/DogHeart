@@ -472,7 +472,7 @@ def ml_kfold(model, out_dir, dataset_path, participant_to_keep=None, samples=Non
 
     X_scaled = StandardScaler().fit_transform(X_imputed)
 
-    pca = PCA(n_components=5)
+    pca = PCA(n_components=15)
     X_pca = pca.fit_transform(X_scaled)
 
     # X_train, X_test, y_train, y_test = train_test_split(
