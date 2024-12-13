@@ -7,8 +7,10 @@ import numpy as np
 import pandas as pd
 from matplotlib import rcParams
 from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split, RepeatedKFold
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 import scipy.stats as stats
@@ -32,31 +34,8 @@ from sklearn.metrics import RocCurveDisplay
 from visu import show_db
 
 
-def svm_loocv(out_dir, dataset_path, n_bootstrap=10, n_job=6):
-    out_dir.mkdir(parents=True, exist_ok=True)
-    df_raw = pd.read_csv(dataset_path)
-    features_columns_pulse = [x for x in df_raw.columns if "pulse" in x.lower()]
-    features_columns_counts = [x for x in df_raw.columns if "count" in x.lower()]
-    features_columns_mag = [x for x in df_raw.columns if "magnitude" in x.lower()]
-    features_columns_acc = [x for x in df_raw.columns if "acc" in x.lower()]
-    df_raw["unique_values_pulse"] = df_raw[features_columns_pulse].apply(
-        lambda row: row.nunique(), axis=1
-    )
-
-    #df_raw = df_raw[df_raw["unique_values_pulse"] > 2000].copy()
-    df = df_raw
-    df = df[df["mean"] > 3]
-    df = df[
-        df["missingness_percentage"] <= 10
-    ]
-    # df = df[df["pos_value_count"] > 100] #keep samples with positive values  above threshold
-    df = df[df["label"] != "C"]  # remove C category
-    #df = df[pd.isna(df["clinic"])]  # only keep home data
-
-    # Use only pulse features for this example
-    features = features_columns_pulse
-    df_X = df[features]
-    df_y = df["label"]
+def svm_loocv(out_dir, dataset_path, participant_to_keep=None, n_bootstrap=10, n_job=6):
+    df, df_X, df_y, features = get_samples(out_dir, dataset_path)
 
     # Target variable binary encoding
     y = df_y.apply(lambda x: 1 if x in ["B2"] else 0)
@@ -194,30 +173,8 @@ def svm_loocv(out_dir, dataset_path, n_bootstrap=10, n_job=6):
     return df
 
 
-def svm_l2out(out_dir, dataset_path, samples=None):
-    out_dir.mkdir(parents=True, exist_ok=True)
-    df_raw = pd.read_csv(dataset_path)
-    features_columns_pulse = [x for x in df_raw.columns if "pulse" in x.lower()]
-    features_columns_counts = [x for x in df_raw.columns if "count" in x.lower()]
-    features_columns_mag = [x for x in df_raw.columns if "magnitude" in x.lower()]
-    features_columns_acc = [x for x in df_raw.columns if "acc" in x.lower()]
-    df_raw["unique_values_pulse"] = df_raw[features_columns_pulse].apply(
-        lambda row: row.nunique(), axis=1
-    )
-
-    #df_raw = df_raw[df_raw["unique_values_pulse"] > 2000].copy()
-    df = df_raw
-    #df = df[df["mean"] > 3]
-    df = df[
-        df["missingness_percentage"] <= 5
-    ]  # keep samples with less than 50% of missing points
-    # df = df[df["pos_value_count"] > 100] #keep samples with positive values  above threshold
-    df = df[df["label"] != "C"]  # remove C category
-    #df = df[pd.isna(df["clinic"])]  # only keep home data
-
-    features = features_columns_pulse
-    df_X = df[features]
-    df_y = df["label"]
+def ml_l2out(model, out_dir, dataset_path, participant_to_keep=None, samples=None):
+    df, df_X, df_y, features = get_samples(out_dir, dataset_path)
 
     df_meta = (
         df["clinic"].astype(str) + df["home"].astype(str) + df["label"].astype(str)
@@ -303,10 +260,7 @@ def svm_l2out(out_dir, dataset_path, samples=None):
         # Now you can proceed with your model training and evaluation in each fold
         print(f"Fold {ifold + 1}: Leaving out participants {group1} and {group2}")
 
-        # Train the SVM model
-        model = SVC(kernel="rbf", probability=True, random_state=0)
         model.fit(X_train, y_train)
-
         y_pred = model.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
         print(f"Model Accuracy: {accuracy * 100:.2f}%")
@@ -417,9 +371,12 @@ def svm_l2out(out_dir, dataset_path, samples=None):
     return df
 
 
-def svm(out_dir, dataset_path, samples=None):
+def get_samples(out_dir, dataset_path):
     out_dir.mkdir(parents=True, exist_ok=True)
     df_raw = pd.read_csv(dataset_path)
+    if participant_to_keep is not None:
+        df_raw = df_raw[df_raw["participant_id"].isin(participant_to_keep)]
+
     features_columns_pulse = [x for x in df_raw.columns if "pulse" in x.lower()]
     features_columns_counts = [x for x in df_raw.columns if "count" in x.lower()]
     features_columns_mag = [x for x in df_raw.columns if "magnitude" in x.lower()]
@@ -448,6 +405,8 @@ def svm(out_dir, dataset_path, samples=None):
     df_X = df[features]
     df_y = df["label"]
 
+    ###################################
+    # Here we build a new dataset by creating 2d histogram with the pulse and activity count data
     hist_samples = []
     for (index, row_pulse), (index, row_count) in zip(df_pulse.iterrows(), df_count.iterrows()):
         data1 = row_pulse.tolist()
@@ -458,6 +417,12 @@ def svm(out_dir, dataset_path, samples=None):
 
     df_hist = pd.DataFrame(hist_samples)
     df_X = df_hist
+    ###################################
+    return df, df_X, df_y, features
+
+
+def ml_kfold(model, out_dir, dataset_path, participant_to_keep=None, samples=None):
+    df, df_X, df_y, features = get_samples(out_dir, dataset_path)
 
     df_meta = (
         df["clinic"].astype(str) + df["home"].astype(str) + df["label"].astype(str)
@@ -514,7 +479,7 @@ def svm(out_dir, dataset_path, samples=None):
     #     X_pca, y, test_size=0.4, random_state=0
     # )
 
-    rkf = RepeatedKFold(n_splits=2, n_repeats=100, random_state=0)
+    rkf = RepeatedKFold(n_splits=5, n_repeats=100, random_state=0)
     aucs_train, aucs_test, precisions, sensitivities = [], [], [], []
     fprs_test, tprs_test = [], []
     fprs_train, tprs_train = [], []
@@ -527,8 +492,6 @@ def svm(out_dir, dataset_path, samples=None):
         X_train, X_test = X_pca[train_index], X_pca[test_index]
         y_train, y_test = y[train_index], y[test_index]
 
-        # Train the SVM model
-        model = SVC(kernel="rbf", probability=True, random_state=0)
         model.fit(X_train, y_train)
 
         y_pred = model.predict(X_test)
@@ -646,15 +609,41 @@ def mean_ci(data):
     return mean, ci
 
 
-
 if __name__ == "__main__":
-    df_samples = svm(
-        Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv")
-    )
-    # svm_loocv(
-    #     Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv")
-    # )
+    participant_to_keep = [4, 7, 10, 11, 14, 15, 17, 20, 21, 22, 23, 25, 26, 28, 29]
 
-    # svm_l2out(
-    #     Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv")
-    # )
+    ml_kfold(
+        SVC(kernel="rbf", probability=True, random_state=0),
+        Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv"),
+        participant_to_keep=participant_to_keep
+    )
+
+    ml_kfold(
+        KNeighborsClassifier(n_neighbors=3),
+        Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv"),
+        participant_to_keep=participant_to_keep
+    )
+
+    ml_kfold(
+        LogisticRegression(),
+        Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv"),
+        participant_to_keep=participant_to_keep
+    )
+
+    ml_l2out(
+        SVC(kernel="rbf", probability=True, random_state=0),
+        Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv"),
+        participant_to_keep=participant_to_keep
+    )
+
+    ml_kfold(
+        KNeighborsClassifier(n_neighbors=3),
+        Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv"),
+        participant_to_keep=participant_to_keep,
+    )
+
+    ml_l2out(
+        LogisticRegression(),
+        Path("output/ml"), Path("output/datasets5/cleaned_dataset_full.csv"),
+        participant_to_keep=participant_to_keep,
+    )
